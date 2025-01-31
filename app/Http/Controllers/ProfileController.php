@@ -2,59 +2,64 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ProfileUpdateRequest;
-use Illuminate\Http\RedirectResponse;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redirect;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
-    /**
-     * Display the user's profile form.
-     */
-    public function edit(Request $request): View
+    public function __construct()
     {
-        return view('profile.edit', [
-            'user' => $request->user(),
-        ]);
+        $this->data['link_active'] = 'profile';
     }
 
-    /**
-     * Update the user's profile information.
-     */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function index()
     {
-        $request->user()->fill($request->validated());
+        $this->data['user'] = auth()->user();
+        $this->data['action'] = route('profile.store');
+        return view('profile.index',$this->data);
+    }
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+    public function store(Request $request)
+    {
+        $user = auth()->user();
+
+        $rules = [
+            'name'  => 'required|string',
+            'email' => 'required|email',
+        ];
+
+        $message = [
+            'name.required'                     => 'Name must be required',
+            'name.string'                       => 'Name not valid',
+            'email.required'                    => 'Email must be required',
+            'email.email'                       => 'Email not valid',
+        ];
+
+        if($request->email != $user->email){
+            $rules['email']           = 'required|string|unique:users';
+            $message['email.unique']  = 'Email is already in use';
         }
 
-        $request->user()->save();
+        $request->validate($rules,$message);
 
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        try {
+            DB::beginTransaction();
+            User::where('id',$user->id)->update($request->except(['_token']));
+            DB::commit();
+            return redirect()->route('profile.index')->with('success','Successfully changed profile');
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            return response()->json([
+                'status'    => false,
+                'message'   => $th->getMessage(),
+            ], 500);
+        }
     }
 
-    /**
-     * Delete the user's account.
-     */
-    public function destroy(Request $request): RedirectResponse
+    public function setting()
     {
-        $request->validateWithBag('userDeletion', [
-            'password' => ['required', 'current_password'],
-        ]);
-
-        $user = $request->user();
-
-        Auth::logout();
-
-        $user->delete();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return Redirect::to('/');
+        $this->data['action'] = route('user-password.update');
+        return view('profile.setting',$this->data);
     }
 }

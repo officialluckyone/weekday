@@ -4,20 +4,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
+use App\Models\Task;
 
 class Project extends Model
 {
     use HasFactory;
+    protected $guarded = ['id'];
+    protected $table = 'projects';
 
-    protected $fillable = [
-        'name',
-        'description',
-        'start_date',
-        'end_date',
-    ];
-
-    public function tasks()
+    public function pic()
     {
-        return $this->hasMany(Task::class);
+        return $this->belongsTo(User::class, 'pic_id');
+    }
+
+    public function task()
+    {
+        return $this->hasMany(Task::class, 'project_id');
     }
 }
